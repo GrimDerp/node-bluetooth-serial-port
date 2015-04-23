@@ -403,7 +403,7 @@ Handle<Value> DeviceINQ::ListPairedDevices(const Arguments& args) {
         Local<Array> servicesArray =  Array::New(1);
         Local<Object> serviceObj = Object::New();
         //TODO Channel should be found through SDP
-        serviceObj->Set(String::NewSymbol("channel_id"), Int32::New(1));
+        serviceObj->Set(String::NewSymbol("channelID"), Int32::New(1));
         serviceObj->Set(String::NewSymbol("name"), String::New("SPP"));
         servicesArray->Set(0, serviceObj);
         deviceObj->Set(String::NewSymbol("services"), servicesArray);
