@@ -99,10 +99,13 @@ void BTSerialPortBinding::EIO_Write(uv_work_t *req) {
     BluetoothWorker *worker = [BluetoothWorker getInstance];
     NSString *address = [NSString stringWithCString:data->address encoding:NSASCIIStringEncoding];
 
-    if ([worker writeAsync: data->bufferData length: data->bufferLength toDevice: address] != kIOReturnSuccess) {
+    unsigned short bytesWriten = 0;
+
+    if ([worker writeAsync: data->bufferData length: data->bufferLength toDevice: address bytesWriten: &bytesWriten] != kIOReturnSuccess) {
         sprintf(data->errorString, "Write was unsuccessful");
+        data->result = bytesWriten;
     } else {
-        data->result = data->bufferLength;
+        data->result = bytesWriten;
     }
     
     [pool release];
@@ -115,7 +118,7 @@ void BTSerialPortBinding::EIO_AfterWrite(uv_work_t *req) {
     Handle<Value> argv[2];
     if (data->errorString[0]) {
         argv[0] = Exception::Error(String::New(data->errorString));
-        argv[1] = Undefined();
+        argv[1] = v8::Int32::New(data->result);
     } else {
         argv[0] = Undefined();
         argv[1] = v8::Int32::New(data->result);

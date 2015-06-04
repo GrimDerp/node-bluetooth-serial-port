@@ -42,9 +42,9 @@ struct device_info_t {
 + (id)getInstance;
 - (void) disconnectFromDevice: (NSString *) address;
 - (IOReturn)connectDevice: (NSString *) address onChannel: (int) channel withPipe: (pipe_t *)pipe;
-- (IOReturn)writeAsync:(void *)data length:(UInt16)length toDevice: (NSString *)address;
-- (void) inquireWithPipe: (pipe_t *)pipe;
-- (int) getRFCOMMChannelID: (NSString *) address;
+- (IOReturn)writeAsync:(void *)data length:(UInt16)length toDevice: (NSString *)address bytesWriten: (unsigned short *)bytesWriten;
+- (void)inquireWithPipe: (pipe_t *)pipe;
+- (int)getRFCOMMChannelID: (NSString *) address;
 
 - (void)rfcommChannelData:(IOBluetoothRFCOMMChannel*)rfcommChannel data:(void *)dataPointer length:(size_t)dataLength;
 - (void)rfcommChannelClosed:(IOBluetoothRFCOMMChannel*)rfcommChannel;

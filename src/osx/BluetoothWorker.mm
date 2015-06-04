@@ -37,15 +37,18 @@ using namespace v8;
 @interface BTData : NSObject {
 	NSData *data;
 	NSString *address;
+    unsigned short *bytesWriten;
 }
 @property (nonatomic, assign) NSData *data;
 @property (nonatomic, assign) NSString *address;
+@property (nonatomic, assign) unsigned short *bytesWriten;
 @end
 
 /** Implementation of bt data class */
 @implementation BTData
 @synthesize data;
 @synthesize address;
+@synthesize bytesWriten;
 @end
 
 /** Class that is handling all the Bluetooth work */
@@ -177,13 +180,15 @@ using namespace v8;
 }
 
 /** Write synchronized to a connected Bluetooth device */
-- (IOReturn)writeAsync:(void *)data length:(UInt16)length toDevice: (NSString *)address
+- (IOReturn)writeAsync:(void *)data length:(UInt16)length toDevice: (NSString *)address bytesWriten:(UInt16 *)bytesWriten
 {
 	[writeLock lock];
 	
 	BTData *writeData = [[BTData alloc] init];
 	writeData.data = [NSData dataWithBytes: data length: length];
 	writeData.address = address;
+    writeData.bytesWriten = bytesWriten;
+    *(writeData.bytesWriten) = 0;
 
 	// wait for the write to be performed on the worker thread
 	[self performSelector:@selector(writeAsyncTask:) onThread:worker withObject:writeData waitUntilDone:true];
@@ -197,35 +202,37 @@ using namespace v8;
 /** Task to do the writing */
 - (void)writeAsyncTask:(BTData *)writeData
 {
-	@synchronized(self) {
-		BluetoothDeviceResources *res = [devices objectForKey:writeData.address];
+	if (res != nil) {
+		char *idx = (char *)[writeData.data bytes];
+		ssize_t numBytesRemaining;
+		BluetoothRFCOMMMTU rfcommChannelMTU;
 
-		if (res != nil) {
-			char *idx = (char *)[writeData.data bytes];
-			ssize_t numBytesRemaining;
-			BluetoothRFCOMMMTU rfcommChannelMTU;
-			
-			numBytesRemaining = [writeData.data length];
-			writeResult = kIOReturnSuccess;
-			
-			// Get the RFCOMM Channel's MTU.  Each write can only
-			// contain up to the MTU size number of bytes.
-			rfcommChannelMTU = [res.channel getMTU];
-			
-			// Loop through the data until we have no more to send.
-			while ((writeResult == kIOReturnSuccess) && (numBytesRemaining > 0)) {
-				// finds how many bytes I can send:
-				ssize_t numBytesToWrite = ((numBytesRemaining > rfcommChannelMTU) ? rfcommChannelMTU :  numBytesRemaining);
-				
-				// Send the bytes
-				writeResult = [res.channel writeAsync:idx length:numBytesToWrite refcon:NULL];
-				
-				// Updates the position in the buffer:
-				numBytesRemaining -= numBytesToWrite;
-				idx += numBytesToWrite;
-			}
+		numBytesRemaining = [writeData.data length];
+		writeResult = kIOReturnSuccess;
+
+		// Get the RFCOMM Channel's MTU.  Each write can only
+		// contain up to the MTU size number of bytes.
+		rfcommChannelMTU = [res.channel getMTU];
+
+		// Loop through the data until we have no more to send.
+		while ((writeResult == kIOReturnSuccess) && (numBytesRemaining > 0)) {
+			// finds how many bytes I can send:
+			ssize_t numBytesToWrite = ((numBytesRemaining > rfcommChannelMTU) ? rfcommChannelMTU :  numBytesRemaining);
+
+			// Send the bytes
+			writeResult = [res.channel writeAsync:idx length:numBytesToWrite refcon:res];
+
+			// Updates the position in the buffer:
+			numBytesRemaining -= numBytesToWrite;
+			idx += numBytesToWrite;
+
+            if (writeResult == kIOReturnSuccess) {
+                *(writeData.bytesWriten) += numBytesToWrite;
+            }
 		}
 	}
+
+	CFRunLoopStop(CFRunLoopGetCurrent());
 }
 
 /** Inquire Bluetooth devices and send results through the given pipe */
